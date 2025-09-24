@@ -1,0 +1,100 @@
+name: Build Android APK
+
+on:
+  # Trigger on push to main branch
+  push:
+    branches: [ main ]
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Create keystore file
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/artofmind-release-key.keystore
+
+      - name: Create gradle.properties
+        run: |
+          echo "ARTOFMIND_UPLOAD_STORE_FILE=artofmind-release-key.keystore" >> android/gradle.properties
+          echo "ARTOFMIND_UPLOAD_KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> android/gradle.properties
+          echo "ARTOFMIND_UPLOAD_STORE_PASSWORD=${{ secrets.STORE_PASSWORD }}" >> android/gradle.properties
+          echo "ARTOFMIND_UPLOAD_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> android/gradle.properties
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build Android Release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: artofmind-app-release
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Art of Mind App v${{ github.run_number }}
+          body: |
+            **Art of Mind Android App - Release Build**
+
+            📱 **How to Install:**
+            1. Download the APK file below
+            2. Enable "Unknown Sources" in Android Settings
+            3. Install the APK file
+
+            🌐 **Features:**
+            - Native home screen with Greek content
+            - Full website access (artofmind.gr/el/)
+            - Professional design
+            - Android navigation support
+
+            📋 **App Info:**
+            - Build Number: ${{ github.run_number }}
+            - Build Date: ${{ github.event.head_commit.timestamp }}
+            - Commit: ${{ github.sha }}
+          draft: false
+          prerelease: false
+
+      - name: Upload APK to Release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: android/app/build/outputs/apk/release/app-release.apk
+          asset_name: ArtOfMind-v${{ github.run_number }}.apk
+          asset_content_type: application/vnd.android.package-archive

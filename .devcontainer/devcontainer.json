@@ -1,0 +1,24 @@
+{
+  "name": "Art of Mind App Builder",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "17"
+    },
+    "ghcr.io/devcontainers/features/android-sdk:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.vscode-json"
+      ]
+    }
+  },
+  "postCreateCommand": "npm install",
+  "forwardPorts": [8081, 3000],
+  "portsAttributes": {
+    "8081": {
+      "label": "Metro Bundler"
+    }
+  }
+}
